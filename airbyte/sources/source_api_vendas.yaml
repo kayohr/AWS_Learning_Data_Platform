@@ -1,0 +1,35 @@
+# Source Airbyte: REST API de Vendas
+# Equivalente AWS: Lambda customizada que chama a API + coloca no S3
+
+name: "API de Vendas - Sistema ERP"
+connector_type: http_request
+version: "1.0.0"
+
+config:
+  base_url: "https://api.erp-vendas.com.br/v2"
+  authentication:
+    type: "Bearer"
+    token: "{{env:ERP_API_TOKEN}}"
+
+  # Rate limiting (API tem limite de requisições)
+  rate_limiting:
+    requests_per_minute: 60
+
+streams:
+  - name: "vendas"
+    path: "/vendas"
+    method: "GET"
+    sync_mode: "incremental"
+    cursor_field: "updated_at"    # API retorna campo updated_at
+    params:
+      format: "json"
+      limit: 500
+      # Cursor: "updated_at[gte]={{cursor_value}}"
+      updated_after: "{{cursor_value}}"
+
+_nota_aws: >
+  No AWS sem Airbyte:
+    EventBridge (cron a cada hora)
+    → Lambda (chama API, pagina resultados)
+    → Coloca JSON no S3 raw/vendas/
+    Custo: Lambda ~$0 (free tier) + EventBridge ~$0

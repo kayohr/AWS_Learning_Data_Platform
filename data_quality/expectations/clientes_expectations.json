@@ -1,0 +1,96 @@
+{
+  "_comentario": "Great Expectations Suite para dados de clientes",
+  "_descricao": "Define as expectativas (regras) de qualidade para a tabela de clientes. No AWS Glue Data Quality, isso seria configurado via DQDL (Data Quality Definition Language).",
+
+  "expectation_suite_name": "clientes_raw_suite",
+  "data_asset_type": "Dataset",
+  "meta": {
+    "great_expectations_version": "0.18.8",
+    "criado_em": "2024-01-15",
+    "responsavel": "time-dados",
+    "descricao": "Suite de qualidade para dados brutos de clientes (zona raw)"
+  },
+
+  "expectations": [
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {"column": "cpf"},
+      "_comentario": "Coluna CPF deve existir (campo obrigatório)"
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {"column": "nome"},
+      "_comentario": "Coluna nome deve existir"
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "cpf",
+        "mostly": 0.99
+      },
+      "_comentario": "99% dos CPFs devem ser não-nulos (aceita 1% de erros)"
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "nome",
+        "mostly": 0.99
+      }
+    },
+    {
+      "expectation_type": "expect_column_value_lengths_to_be_between",
+      "kwargs": {
+        "column": "cpf",
+        "min_value": 11,
+        "max_value": 14,
+        "mostly": 0.95
+      },
+      "_comentario": "CPF: entre 11 (sem formatação) e 14 (com formatação: 000.000.000-00) caracteres"
+    },
+    {
+      "expectation_type": "expect_column_values_to_match_regex",
+      "kwargs": {
+        "column": "email",
+        "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+        "mostly": 0.90
+      },
+      "_comentario": "90% dos emails devem ter formato válido"
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "uf",
+        "value_set": ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
+                       "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
+                       "RS","RO","RR","SC","SP","SE","TO"],
+        "mostly": 0.98
+      },
+      "_comentario": "UF deve ser uma sigla de estado brasileiro válida"
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "segmento_cliente",
+        "value_set": ["B2B", "B2C"],
+        "mostly": 0.99
+      },
+      "_comentario": "Segmento deve ser B2B (empresas) ou B2C (pessoas físicas)"
+    },
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": {
+        "min_value": 100,
+        "max_value": 1000000
+      },
+      "_comentario": "Dataset deve ter entre 100 e 1 milhão de registros"
+    },
+    {
+      "expectation_type": "expect_column_proportion_of_unique_values_to_be_between",
+      "kwargs": {
+        "column": "cpf",
+        "min_value": 0.95
+      },
+      "_comentario": "95% dos CPFs devem ser únicos (no máximo 5% de duplicatas aceitáveis)"
+    }
+  ]
+}

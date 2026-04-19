@@ -1,0 +1,46 @@
+{
+  "_comentario": "Simula AWS IAM Roles para os serviços da plataforma",
+  "_descricao": "No AWS real, cada serviço assume uma Role para obter permissões temporárias. Isso é mais seguro que credenciais fixas (sem senhas em código!)",
+
+  "Roles": [
+    {
+      "RoleName": "data-platform-glue-etl-role",
+      "Description": "Role para os jobs Glue ETL - pode ler do S3 raw e escrever em processed",
+      "AssumedBy": "glue.amazonaws.com",
+      "_aws_real": "arn:aws:iam::123456789:role/data-platform-glue-etl-role",
+      "Policies": ["data-platform-s3-raw-read", "data-platform-s3-processed-write",
+                   "data-platform-glue-catalog-write", "data-platform-cloudwatch-logs"],
+      "_principio": "Mínimo privilégio: só lê raw/ e escreve em processed/ (não pode deletar!)"
+    },
+    {
+      "RoleName": "data-platform-lambda-role",
+      "Description": "Role para funções Lambda",
+      "AssumedBy": "lambda.amazonaws.com",
+      "Policies": ["data-platform-s3-raw-readwrite", "data-platform-sqs-consumer",
+                   "data-platform-cloudwatch-logs", "data-platform-sns-publish"],
+      "_principio": "Lambda pode ler/escrever no S3 raw, consumir SQS e enviar notificações"
+    },
+    {
+      "RoleName": "data-platform-redshift-role",
+      "Description": "Role para o Redshift fazer COPY do S3",
+      "AssumedBy": "redshift.amazonaws.com",
+      "Policies": ["data-platform-s3-processed-read"],
+      "_principio": "Redshift só precisa LER do S3 processed/ para o comando COPY"
+    },
+    {
+      "RoleName": "data-platform-airflow-role",
+      "Description": "Role para o Airflow (MWAA) orquestrar os serviços",
+      "AssumedBy": "airflow.amazonaws.com",
+      "Policies": ["data-platform-glue-start-jobs", "data-platform-lambda-invoke",
+                   "data-platform-s3-readonly", "data-platform-sqs-send"],
+      "_principio": "Airflow pode disparar jobs mas NÃO pode ler dados (separação de funções)"
+    },
+    {
+      "RoleName": "data-platform-analyst-role",
+      "Description": "Role para analistas de dados - acesso apenas a Data Marts",
+      "AssumedBy": "user/analysts",
+      "Policies": ["data-platform-redshift-dm-read"],
+      "_principio": "Analistas só veem data marts (dm.*), nunca dados brutos (staging.*)"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "_comentario": "Simula AWS IAM Policies - define as permissões específicas",
+
+  "Policies": [
+    {
+      "PolicyName": "data-platform-s3-raw-read",
+      "Description": "Permite apenas leitura na zona raw do S3",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["s3:GetObject", "s3:ListBucket"],
+          "Resource": ["arn:aws:s3:::data-lake-bucket/raw/*"],
+          "_local": "./s3/raw/"
+        }
+      ]
+    },
+    {
+      "PolicyName": "data-platform-s3-processed-write",
+      "Description": "Permite escrita na zona processed (mas não delete)",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["s3:PutObject", "s3:GetObject"],
+          "Resource": ["arn:aws:s3:::data-lake-bucket/processed/*"]
+        },
+        {
+          "Effect": "Deny",
+          "Action": ["s3:DeleteObject"],
+          "Resource": ["arn:aws:s3:::data-lake-bucket/*"],
+          "_motivo": "Nenhum processo automatizado deve deletar dados diretamente!"
+        }
+      ]
+    },
+    {
+      "PolicyName": "data-platform-sqs-consumer",
+      "Description": "Permite consumir mensagens da fila de vendas",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+          "Resource": ["arn:aws:sqs:us-east-1:123456789:vendas-queue"]
+        }
+      ]
+    },
+    {
+      "PolicyName": "data-platform-redshift-dm-read",
+      "Description": "Acesso somente leitura ao schema dm (data marts)",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["redshift:GetClusterCredentials"],
+          "Resource": ["arn:aws:redshift:*:*:dbname:cluster/dm"],
+          "_sql_grant": "GRANT SELECT ON ALL TABLES IN SCHEMA dm TO GROUP analysts;"
+        }
+      ]
+    }
+  ]
+}

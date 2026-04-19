@@ -1,0 +1,139 @@
+{
+  "_comentario": "Simulação do AWS Glue Data Catalog - Tabela clientes",
+  "_descricao": "No AWS real, este schema seria criado automaticamente pelo Glue Crawler ou manualmente via console. É usado pelo Athena para consultar dados no S3 sem precisar de um banco de dados.",
+  "_aws_equivalente": "aws glue create-table --database-name raw_db --table-input file://schema_clientes.json",
+
+  "DatabaseName": "raw_db",
+  "TableInput": {
+    "Name": "clientes",
+    "Description": "Dados de clientes extraídos do CRM - zona raw (dados brutos)",
+    "TableType": "EXTERNAL_TABLE",
+
+    "Parameters": {
+      "classification": "json",
+      "compressionType": "none",
+      "typeOfData": "file",
+      "_comentario_parameters": "No Glue real: classification define como o Crawler interpretou o arquivo"
+    },
+
+    "StorageDescriptor": {
+      "_comentario": "StorageDescriptor define onde os dados estão e como lê-los",
+
+      "Location": "s3://minha-empresa-data-lake/raw/clientes/",
+      "_location_local": "./s3/raw/clientes/",
+
+      "InputFormat": "org.apache.hadoop.mapred.TextInputFormat",
+      "OutputFormat": "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+
+      "SerdeInfo": {
+        "_comentario": "SerDe = Serializer/Deserializer - como ler o formato JSON",
+        "SerializationLibrary": "org.openx.data.jsonserde.JsonSerDe",
+        "Parameters": {
+          "serialization.format": "1",
+          "ignore.malformed.json": "TRUE"
+        }
+      },
+
+      "Columns": [
+        {
+          "Name": "id",
+          "Type": "bigint",
+          "Comment": "ID único do cliente no CRM (chave primária)"
+        },
+        {
+          "Name": "cpf",
+          "Type": "string",
+          "Comment": "CPF do cliente - pode vir com ou sem formatação (000.000.000-00)"
+        },
+        {
+          "Name": "nome",
+          "Type": "string",
+          "Comment": "Nome completo do cliente"
+        },
+        {
+          "Name": "email",
+          "Type": "string",
+          "Comment": "E-mail do cliente para contato"
+        },
+        {
+          "Name": "telefone",
+          "Type": "string",
+          "Comment": "Telefone com DDD - formato variável na origem"
+        },
+        {
+          "Name": "data_nascimento",
+          "Type": "string",
+          "Comment": "Data de nascimento formato YYYY-MM-DD"
+        },
+        {
+          "Name": "data_cadastro",
+          "Type": "string",
+          "Comment": "Data e hora do cadastro no CRM"
+        },
+        {
+          "Name": "cidade",
+          "Type": "string",
+          "Comment": "Cidade de residência do cliente"
+        },
+        {
+          "Name": "uf",
+          "Type": "string",
+          "Comment": "Sigla do estado (SP, RJ, MG, etc.)"
+        },
+        {
+          "Name": "cep",
+          "Type": "string",
+          "Comment": "CEP sem formatação (8 dígitos)"
+        },
+        {
+          "Name": "segmento_cliente",
+          "Type": "string",
+          "Comment": "Segmento de negócio: B2B ou B2C"
+        },
+        {
+          "Name": "limite_credito",
+          "Type": "double",
+          "Comment": "Limite de crédito em reais (R$)"
+        },
+        {
+          "Name": "ativo",
+          "Type": "boolean",
+          "Comment": "Se o cliente está ativo no CRM"
+        }
+      ],
+
+      "Compressed": false,
+      "NumberOfBuckets": -1,
+      "StoredAsSubDirectories": false
+    },
+
+    "PartitionKeys": [
+      {
+        "Name": "ano",
+        "Type": "string",
+        "Comment": "Ano de ingestão - particionamento Hive (ano=2024)"
+      },
+      {
+        "Name": "mes",
+        "Type": "string",
+        "Comment": "Mês de ingestão - particionamento Hive (mes=01)"
+      },
+      {
+        "Name": "dia",
+        "Type": "string",
+        "Comment": "Dia de ingestão - particionamento Hive (dia=15)"
+      }
+    ],
+
+    "_comentario_particoes": "Particionamento Hive permite que Athena e Glue leiam apenas os arquivos necessários. Ex: WHERE ano='2024' AND mes='01' → lê apenas a pasta raw/clientes/ano=2024/mes=01/"
+  },
+
+  "_exemplo_query_athena": "SELECT id, nome, cpf, cidade, uf FROM raw_db.clientes WHERE ano='2024' AND mes='01' AND uf='SP' LIMIT 100;",
+
+  "_estatisticas": {
+    "_comentario": "No Glue real, estas estatísticas são atualizadas pelo Crawler",
+    "ultima_atualizacao": "2024-01-15T10:00:00",
+    "total_registros_estimado": 50000,
+    "total_particoes": 365
+  }
+}

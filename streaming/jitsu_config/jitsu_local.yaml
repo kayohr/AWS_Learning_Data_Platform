@@ -1,0 +1,96 @@
+# =============================================================================
+# jitsu_local.yaml - Configuração do Jitsu (coleta de eventos web)
+# =============================================================================
+# CONCEITO JITSU:
+#   Jitsu é como o Google Analytics, mas você controla seus dados.
+#   Coleta eventos do website e envia para seu Data Warehouse.
+#
+#   No AWS real:
+#   - Jitsu enviaria para Kinesis Data Streams
+#   - Ou direto para S3 via Kinesis Firehose
+#   - Ou para o Redshift via Jitsu nativo
+#
+#   Jitsu vs Segment vs Google Analytics:
+#     Google Analytics: Google fica com seus dados
+#     Segment: pago, você controla o destino
+#     Jitsu: open-source, você hospeda, você controla
+# =============================================================================
+
+server:
+  port: 8000
+  name: "jitsu-local-dev"
+
+# Destinos dos eventos coletados
+destinations:
+  # Destino 1: Kafka (para streaming em tempo real)
+  - id: kafka_eventos
+    type: kafka
+    enabled: true
+    config:
+      bootstrap_servers: "kafka:29092"
+      topic: "eventos-website"
+      # Chave de partição = user_id (garante ordem por usuário)
+      partition_key: "user_id"
+
+  # Destino 2: S3 local (para batch processing)
+  - id: s3_raw_eventos
+    type: file
+    enabled: true
+    config:
+      path: "./s3/raw/eventos"
+      format: jsonl           # JSON Lines (um JSON por linha)
+      # Agrupa em arquivos de até 1000 eventos ou 1 hora
+      max_events_per_file: 1000
+      max_duration_minutes: 60
+      # No AWS real: seria S3 + Kinesis Firehose
+      # firehose_stream: "s3-raw-eventos"
+
+# Fontes de eventos (como o Jitsu coleta)
+sources:
+  # JavaScript SDK (snippet no website)
+  - id: website_sdk
+    type: javascript_sdk
+    enabled: true
+    config:
+      # Este snippet vai no HTML do site:
+      # <script>
+      #   !function(t,e){...}("http://localhost:8000", "API_KEY_AQUI")
+      # </script>
+      api_key: "jitsu_dev_key_local_123"
+      # Eventos coletados automaticamente (sem código extra):
+      auto_track:
+        page_view: true       # Toda troca de página
+        clicks: true          # Cliques em elementos com data-jitsu-track
+        form_submit: false    # Formulários (cuidado com dados sensíveis!)
+
+# Transformações nos eventos antes de enviar
+transformations:
+  # Remove informações sensíveis (PII - Personally Identifiable Information)
+  - name: "remover_pii_sensiveis"
+    enabled: true
+    rules:
+      # Remove campos sensíveis (LGPD compliance!)
+      remove_fields:
+        - "credit_card"
+        - "senha"
+        - "token"
+      # Anonimiza IP (guarda apenas os 3 primeiros octetos)
+      # 192.168.1.123 → 192.168.1.xxx
+      anonymize_ip: true
+
+  # Enriquece com dados de geolocalização
+  - name: "enriquecer_geo"
+    enabled: false  # Desabilitado localmente (precisa de banco GeoIP)
+    config:
+      provider: "maxmind"
+
+# Configurações de LGPD (Lei Geral de Proteção de Dados)
+# IMPORTANTE: Colete apenas o necessário!
+lgpd:
+  enabled: true
+  # Exige consentimento antes de rastrear
+  require_consent: false  # Desabilitado localmente para testes
+  # Campos de consentimento
+  consent_cookie: "jitsu_consent"
+  # Quanto tempo guardar dados de eventos (90 dias = 3 meses)
+  retention_days: 90

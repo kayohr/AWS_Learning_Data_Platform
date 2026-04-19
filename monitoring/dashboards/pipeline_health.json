@@ -1,0 +1,54 @@
+{
+  "_comentario": "Configuração de dashboard de saúde da plataforma",
+  "_ferramenta": "Grafana (open-source) ou AWS CloudWatch Dashboards",
+
+  "dashboard": {
+    "title": "Data Platform - Pipeline Health",
+    "refresh": "30s",
+    "timezone": "America/Sao_Paulo"
+  },
+
+  "panels": [
+    {
+      "id": 1,
+      "title": "Status dos Pipelines (últimas 24h)",
+      "type": "stat",
+      "metricas": ["dag_success_rate", "dag_failure_count"],
+      "limites": {"verde": ">0.95", "amarelo": ">0.85", "vermelho": "<=0.85"}
+    },
+    {
+      "id": 2,
+      "title": "Receita Total do Dia",
+      "type": "stat",
+      "query": "SELECT SUM(receita_total) FROM dm.dm_vendas_diarias WHERE data_venda = CURRENT_DATE",
+      "formato": "R$ {{value:,.2f}}"
+    },
+    {
+      "id": 3,
+      "title": "Volume de Vendas por Hora",
+      "type": "timeseries",
+      "query": "SELECT EXTRACT(HOUR FROM data_venda), COUNT(*) FROM dw.fato_vendas WHERE data_venda::DATE = CURRENT_DATE GROUP BY 1 ORDER BY 1"
+    },
+    {
+      "id": 4,
+      "title": "Tamanho das Filas SQS",
+      "type": "gauge",
+      "metricas": ["sqs_vendas_queue_depth", "sqs_dlq_depth"],
+      "limites": {"verde": "<100", "amarelo": "<1000", "vermelho": ">=1000"}
+    },
+    {
+      "id": 5,
+      "title": "Qualidade de Dados (últimos 7 dias)",
+      "type": "table",
+      "colunas": ["data", "dataset", "pass_rate", "checks_falhos"],
+      "fonte": "data_quality/relatorios/"
+    },
+    {
+      "id": 6,
+      "title": "Duração dos Jobs (minutos)",
+      "type": "barchart",
+      "metricas": ["glue_clientes_duration", "glue_vendas_duration", "dw_load_duration"],
+      "sla_linha": 60
+    }
+  ]
+}

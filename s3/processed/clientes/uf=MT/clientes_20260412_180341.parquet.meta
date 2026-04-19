@@ -1,0 +1,11 @@
+{
+  "key": "processed/clientes/uf=MT/clientes_20260412_180341.parquet",
+  "size": 12569,
+  "etag": "ad27078ecb6de5d2d087928b5da5278b",
+  "last_modified": "2026-04-12T18:03:41.580662",
+  "metadata": {
+    "job": "clientes_raw_to_processed",
+    "particao": "MT",
+    "rows": "5"
+  }
+}

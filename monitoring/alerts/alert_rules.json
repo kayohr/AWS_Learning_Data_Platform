@@ -1,0 +1,71 @@
+{
+  "_comentario": "Regras de alertas da plataforma - Simula AWS CloudWatch Alarms",
+  "_aws_equivalente": "CloudWatch Alarms + SNS Topics",
+
+  "alert_rules": [
+    {
+      "id": "pipeline_failure",
+      "name": "Pipeline Falhou",
+      "descricao": "Dispara quando qualquer DAG Airflow falha",
+      "severidade": "CRITICO",
+      "condicao": "dag_state == 'failed'",
+      "acao": "notificar_slack_e_email",
+      "cooldown_minutos": 30
+    },
+    {
+      "id": "data_freshness",
+      "name": "Dados Desatualizados",
+      "descricao": "Dispara quando dim_clientes não foi atualizado há mais de 25 horas",
+      "severidade": "ALTO",
+      "condicao": "hours_since_last_update > 25",
+      "tabela": "dw.dim_clientes",
+      "acao": "notificar_slack",
+      "cooldown_minutos": 60
+    },
+    {
+      "id": "row_count_drop",
+      "name": "Queda no Volume de Dados",
+      "descricao": "Dispara quando contagem de vendas cai mais de 20% vs dia anterior",
+      "severidade": "ALTO",
+      "condicao": "today_rows < yesterday_rows * 0.80",
+      "tabela": "dw.fato_vendas",
+      "acao": "notificar_slack",
+      "cooldown_minutos": 120
+    },
+    {
+      "id": "sqs_queue_depth",
+      "name": "Fila SQS Acumulando",
+      "descricao": "Muitas mensagens na fila = consumers não estão processando",
+      "severidade": "MEDIO",
+      "condicao": "queue_depth > 1000",
+      "fila": "vendas_queue",
+      "acao": "notificar_slack",
+      "cooldown_minutos": 30
+    },
+    {
+      "id": "dq_failure",
+      "name": "Falha na Qualidade de Dados",
+      "descricao": "Checks de DQ falharam",
+      "severidade": "ALTO",
+      "condicao": "dq_pass_rate < 0.95",
+      "acao": "notificar_slack_e_email",
+      "cooldown_minutos": 60
+    },
+    {
+      "id": "pipeline_duration",
+      "name": "Pipeline Demorando Muito",
+      "descricao": "Pipeline ETL completo levou mais de 60 minutos",
+      "severidade": "MEDIO",
+      "condicao": "dag_duration_minutes > 60",
+      "dag": "dag_etl_full_pipeline",
+      "acao": "notificar_slack",
+      "cooldown_minutos": 1440
+    }
+  ],
+
+  "_canais_notificacao": {
+    "notificar_slack": "Webhook Slack configurado em SLACK_WEBHOOK_URL",
+    "notificar_email": "Via SES (AWS) ou SMTP local",
+    "notificar_slack_e_email": "Ambos"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "key": "processed/vendas/ano=2026/mes=02/vendas_20260412_180538.parquet",
+  "size": 27957,
+  "etag": "debfbf94fbd9d3ae0c76390ccc926ccb",
+  "last_modified": "2026-04-12T18:05:38.975647",
+  "metadata": {
+    "job": "vendas_raw_to_processed",
+    "particao": "ano=2026/mes=02",
+    "rows": "34"
+  }
+}

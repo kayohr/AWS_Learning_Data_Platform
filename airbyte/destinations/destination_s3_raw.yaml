@@ -1,0 +1,22 @@
+# Destination Airbyte: S3 Raw (zona de aterrissagem)
+name: "S3 Data Lake - Zona Raw"
+connector_type: s3
+
+config:
+  # AWS S3 real:
+  # s3_bucket_name: "minha-empresa-data-lake"
+  # s3_bucket_region: "us-east-1"
+  # s3_bucket_path: "raw"
+  # aws_access_key_id: "{{env:AWS_ACCESS_KEY_ID}}"
+  # aws_secret_access_key: "{{env:AWS_SECRET_ACCESS_KEY}}"
+
+  # Local simulation:
+  local_path: "./s3/raw"
+
+  format:
+    format_type: "JSONL"           # JSON Lines (um JSON por linha)
+    compression: "GZIP"            # Comprime automaticamente
+
+  # Naming convention: inclui data na pasta
+  s3_path_format: "${NAMESPACE}/${STREAM_NAME}/ano=${YEAR}/mes=${MONTH}/dia=${DAY}/${TIMESTAMP}_${UUID}.jsonl.gz"
+  # Resultado: raw/clientes/ano=2024/mes=01/dia=15/20240115143022_abc123.jsonl.gz

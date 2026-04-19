@@ -1,0 +1,152 @@
+{
+  "_comentario": "Simulação do AWS Glue Data Catalog - Tabela vendas",
+  "_descricao": "Schema da tabela de vendas no Data Catalog. Origem: sistema de vendas (ERP) em formato CSV.",
+
+  "DatabaseName": "raw_db",
+  "TableInput": {
+    "Name": "vendas",
+    "Description": "Dados de vendas extraídos do ERP - zona raw",
+    "TableType": "EXTERNAL_TABLE",
+
+    "Parameters": {
+      "classification": "csv",
+      "delimiter": ",",
+      "skip.header.line.count": "1",
+      "_comentario": "CSV com cabeçalho - o Crawler detecta isso automaticamente"
+    },
+
+    "StorageDescriptor": {
+      "Location": "s3://minha-empresa-data-lake/raw/vendas/",
+      "_location_local": "./s3/raw/vendas/",
+
+      "InputFormat": "org.apache.hadoop.mapred.TextInputFormat",
+      "OutputFormat": "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+
+      "SerdeInfo": {
+        "_comentario": "LazySimpleSerDe para CSV",
+        "SerializationLibrary": "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
+        "Parameters": {
+          "field.delim": ",",
+          "serialization.format": ",",
+          "escape.delim": "\\",
+          "quoteChar": "\""
+        }
+      },
+
+      "Columns": [
+        {
+          "Name": "id_venda",
+          "Type": "bigint",
+          "Comment": "ID único da venda (chave primária)"
+        },
+        {
+          "Name": "id_pedido",
+          "Type": "string",
+          "Comment": "Número do pedido no ERP (pode ter letras: PED-2024-00001)"
+        },
+        {
+          "Name": "cpf_cliente",
+          "Type": "string",
+          "Comment": "CPF do cliente comprador - chave para JOIN com tabela clientes"
+        },
+        {
+          "Name": "data_venda",
+          "Type": "string",
+          "Comment": "Data e hora da venda - formato ISO 8601"
+        },
+        {
+          "Name": "data_entrega",
+          "Type": "string",
+          "Comment": "Data prevista/realizada de entrega"
+        },
+        {
+          "Name": "produto_id",
+          "Type": "string",
+          "Comment": "Código do produto no catálogo"
+        },
+        {
+          "Name": "produto_nome",
+          "Type": "string",
+          "Comment": "Nome/descrição do produto"
+        },
+        {
+          "Name": "categoria_produto",
+          "Type": "string",
+          "Comment": "Categoria do produto (Eletrônicos, Vestuário, etc.)"
+        },
+        {
+          "Name": "quantidade",
+          "Type": "int",
+          "Comment": "Quantidade de itens vendidos"
+        },
+        {
+          "Name": "valor_unitario",
+          "Type": "string",
+          "Comment": "Valor unitário em reais - pode ter formatação BR (R$ 1.250,00)"
+        },
+        {
+          "Name": "desconto",
+          "Type": "string",
+          "Comment": "Desconto aplicado em reais"
+        },
+        {
+          "Name": "valor_total",
+          "Type": "string",
+          "Comment": "Valor total da venda após desconto"
+        },
+        {
+          "Name": "custo",
+          "Type": "string",
+          "Comment": "Custo do produto (usado para calcular margem)"
+        },
+        {
+          "Name": "canal_venda",
+          "Type": "string",
+          "Comment": "Canal: LOJA_FISICA, ECOMMERCE, TELEVENDAS, APP_MOBILE"
+        },
+        {
+          "Name": "status_venda",
+          "Type": "string",
+          "Comment": "Status: CONCLUIDA, CANCELADA, DEVOLVIDA, PENDENTE"
+        },
+        {
+          "Name": "forma_pagamento",
+          "Type": "string",
+          "Comment": "CARTAO_CREDITO, CARTAO_DEBITO, PIX, BOLETO, DINHEIRO"
+        },
+        {
+          "Name": "parcelas",
+          "Type": "int",
+          "Comment": "Número de parcelas (1 = à vista)"
+        },
+        {
+          "Name": "vendedor_id",
+          "Type": "string",
+          "Comment": "ID do vendedor responsável"
+        },
+        {
+          "Name": "loja_id",
+          "Type": "string",
+          "Comment": "Código da loja (para vendas físicas)"
+        }
+      ]
+    },
+
+    "PartitionKeys": [
+      {
+        "Name": "ano",
+        "Type": "string",
+        "Comment": "Ano da venda para particionamento"
+      },
+      {
+        "Name": "mes",
+        "Type": "string",
+        "Comment": "Mês da venda para particionamento"
+      }
+    ]
+  },
+
+  "_exemplo_query_athena": "SELECT canal_venda, COUNT(*) as qtd, SUM(CAST(valor_total AS DOUBLE)) as total FROM raw_db.vendas WHERE ano='2024' AND mes='01' GROUP BY canal_venda ORDER BY total DESC;",
+
+  "_nota_importante": "Dados de valor monetário chegam como string do CSV (R$ 1.250,99). O job Glue converte para DOUBLE durante a transformação para processed/."
+}

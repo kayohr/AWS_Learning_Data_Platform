@@ -1,0 +1,80 @@
+{
+  "_comentario": "Configuração da fila SQS de vendas - Simula AWS SQS Queue",
+  "_aws_equivalente": "aws sqs create-queue --queue-name vendas-queue --attributes file://vendas_queue.json",
+
+  "QueueName": "vendas-queue",
+  "QueueType": "Standard",
+
+  "Attributes": {
+    "VisibilityTimeout": "30",
+    "_VisibilityTimeout_explicacao": "Após receber a mensagem, o consumer tem 30 segundos para processá-la. Se não confirmar, a mensagem reaparece na fila para outro consumer.",
+
+    "MessageRetentionPeriod": "86400",
+    "_MessageRetentionPeriod_explicacao": "Mensagens ficam na fila por 24 horas (86400 segundos). No AWS, máximo é 14 dias.",
+
+    "MaximumMessageSize": "262144",
+    "_MaximumMessageSize_explicacao": "Tamanho máximo de 256KB por mensagem. Para dados maiores, guarde no S3 e coloque apenas o ID/path na mensagem.",
+
+    "ReceiveMessageWaitTimeSeconds": "20",
+    "_ReceiveMessageWaitTimeSeconds_explicacao": "Long polling: espera até 20 segundos por mensagens. Reduz chamadas desnecessárias e custo.",
+
+    "DelaySeconds": "0",
+    "_DelaySeconds_explicacao": "Delay para novas mensagens ficarem visíveis. 0 = disponível imediatamente.",
+
+    "RedrivePolicy": {
+      "deadLetterTargetArn": "arn:aws:sqs:us-east-1:123456789:dlq-errors",
+      "_deadLetterTargetArn_local": "dlq_errors",
+      "maxReceiveCount": "3",
+      "_maxReceiveCount_explicacao": "Após 3 tentativas de processamento falharem, a mensagem vai para a DLQ."
+    }
+  },
+
+  "Tags": {
+    "Projeto": "DataPlatform",
+    "Ambiente": "development",
+    "Responsavel": "time-dados",
+    "CostCenter": "engenharia-dados"
+  },
+
+  "_formato_mensagem": {
+    "_descricao": "Formato esperado das mensagens nesta fila",
+    "id_venda": "string (obrigatório) - ID único da venda",
+    "cpf_cliente": "string (obrigatório) - CPF do cliente",
+    "valor_total": "number (obrigatório) - Valor em reais",
+    "data_venda": "string ISO 8601 (obrigatório)",
+    "canal_venda": "string - LOJA_FISICA, ECOMMERCE, etc.",
+    "produto_id": "string - ID do produto",
+    "quantidade": "integer - Quantidade vendida",
+    "_metadata": {
+      "fonte": "string - sistema que gerou a mensagem",
+      "versao_schema": "string - versão do schema (para versionamento)"
+    }
+  },
+
+  "_exemplos_mensagem": [
+    {
+      "id_venda": "VND-2024-001234",
+      "cpf_cliente": "12345678901",
+      "valor_total": 299.90,
+      "data_venda": "2024-01-15T14:30:00-03:00",
+      "canal_venda": "ECOMMERCE",
+      "produto_id": "PROD-001",
+      "quantidade": 2,
+      "_metadata": {
+        "fonte": "sistema-ecommerce",
+        "versao_schema": "1.0"
+      }
+    }
+  ],
+
+  "_metricas_monitoramento": {
+    "_descricao": "No AWS: monitorado via CloudWatch Metrics automaticamente",
+    "ApproximateNumberOfMessages": "Mensagens disponíveis na fila",
+    "ApproximateNumberOfMessagesNotVisible": "Mensagens sendo processadas (in-flight)",
+    "ApproximateAgeOfOldestMessage": "Idade da mensagem mais antiga (freshness)",
+    "_alertas_recomendados": [
+      "Alerta se ApproximateNumberOfMessages > 1000 (fila acumulando)",
+      "Alerta se ApproximateAgeOfOldestMessage > 3600 (1 hora sem processar)"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+# Source Airbyte: Catálogo de Produtos (arquivo CSV compartilhado)
+name: "Catálogo de Produtos CSV"
+connector_type: file
+version: "0.5.0"
+
+config:
+  dataset_name: "catalogo_produtos"
+  format: "csv"
+  provider:
+    storage: "local"
+    file_path: "./s3/raw/catalogo/produtos.csv"
+
+  # Se fosse S3 real:
+  # provider:
+  #   storage: "S3"
+  #   bucket: "minha-empresa-data-lake"
+  #   path_prefix: "raw/catalogo/"
+  #   aws_access_key_id: "{{env:AWS_ACCESS_KEY_ID}}"
+
+  sync_mode: "full_refresh"  # CSV muda pouco, sempre recarrega tudo
+
+_nota: "Arquivos CSV em S3 são uma forma simples de compartilhar dados entre sistemas"

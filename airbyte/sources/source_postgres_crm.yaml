@@ -1,0 +1,36 @@
+# Source Airbyte: CRM PostgreSQL
+# Equivalente AWS: AWS DMS Replication Instance + Source Endpoint
+
+name: "CRM PostgreSQL - Fonte de Clientes"
+connector_type: postgres
+version: "3.3.0"
+
+config:
+  host: "postgres"          # Em produção: IP do servidor CRM
+  port: 5432
+  database: "crm_source"
+  username: "crm_user"
+  password: "{{env:CRM_DB_PASSWORD}}"  # Usa variável de ambiente (nunca senha em texto!)
+  ssl_mode: "prefer"
+  replication_method:
+    method: "Standard"      # Standard = consulta direta ao banco
+    # Para CDC real: method: "CDC" com configuração do replication slot
+
+# Streams (tabelas) a sincronizar
+streams:
+  - name: "clientes"
+    sync_mode: "incremental"
+    cursor_field: "data_cadastro"   # Cursor: campo que indica novos registros
+    primary_key: ["cpf"]
+    _descricao: "Tabela principal de clientes do CRM"
+
+  - name: "contatos_clientes"
+    sync_mode: "full_refresh"       # Pequena tabela, full refresh é ok
+    primary_key: ["id"]
+
+_nota_aws: >
+  No AWS DMS equivalente:
+    - Source Endpoint: RDS PostgreSQL do CRM
+    - Replication Instance: dms.t3.medium (~$0.15/hora)
+    - Migration Type: Full load + CDC
+    - Custo: ~$0.15/hora + $0.10/GB processado

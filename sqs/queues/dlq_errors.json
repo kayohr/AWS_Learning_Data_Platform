@@ -1,0 +1,37 @@
+{
+  "_comentario": "Dead Letter Queue (DLQ) - Fila para mensagens que falharam",
+  "_descricao": "Quando uma mensagem da fila principal falha 3 vezes, ela vem para cá. O time de dados deve monitorar e investigar estas mensagens.",
+
+  "QueueName": "dlq-errors",
+  "QueueType": "Standard",
+
+  "Attributes": {
+    "MessageRetentionPeriod": "1209600",
+    "_explicacao": "Mensagens ficam 14 dias na DLQ (máximo do SQS). Tempo para investigar."
+  },
+
+  "_como_funciona": [
+    "1. Mensagem chega na vendas-queue",
+    "2. Lambda tenta processar e FALHA (timeout, erro, etc.)",
+    "3. Visibility timeout expira, mensagem reaparece na fila",
+    "4. Lambda tenta novamente (2ª vez) - FALHA",
+    "5. Lambda tenta novamente (3ª vez) - FALHA",
+    "6. Após 3 falhas (maxReceiveCount=3): mensagem vai para dlq-errors",
+    "7. Time recebe alerta e investiga a mensagem problemática"
+  ],
+
+  "_casos_comuns_dlq": [
+    "Mensagem com schema inválido (campo faltando, tipo errado)",
+    "CPF inválido que quebrou a validação",
+    "Valor monetário em formato inesperado",
+    "Referência a produto inexistente no catálogo",
+    "Timeout: arquivo muito grande para processar no tempo limite"
+  ],
+
+  "_como_remediar": {
+    "1_investigar": "Ler mensagens da DLQ para entender o problema",
+    "2_corrigir": "Corrigir o código Lambda ou os dados",
+    "3_redrive": "Mover mensagens de volta para a fila principal (SQS Redrive)",
+    "4_prevenir": "Adicionar validação para evitar o problema no futuro"
+  }
+}

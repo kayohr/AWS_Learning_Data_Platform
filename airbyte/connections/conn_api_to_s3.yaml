@@ -1,0 +1,18 @@
+# Conexão Airbyte: API Vendas → S3 Raw (incremental horário)
+
+name: "API Vendas → S3 Raw"
+source_id: "source_api_vendas"
+destination_id: "destination_s3_raw"
+
+schedule:
+  cron_expression: "0 * * * *"   # A cada hora
+  timezone: "America/Sao_Paulo"
+
+streams:
+  - name: "vendas"
+    sync_mode: "incremental"
+    destination_sync_mode: "append"
+    cursor_field: "updated_at"
+
+status: "active"
+_nota: "Incremental horário: pega apenas vendas novas/alteradas desde a última sync"

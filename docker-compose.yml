@@ -1,0 +1,384 @@
+# =============================================================================
+# DOCKER COMPOSE - Plataforma de Dados Local
+# =============================================================================
+# Este arquivo sobe todos os serviços necessários para simular a plataforma AWS.
+#
+# SERVIÇOS:
+#   - postgres      : Simula o Amazon Redshift (Data Warehouse)
+#   - airflow-*     : Simula o AWS MWAA (orquestração)
+#   - kafka         : Simula o Amazon Kinesis (streaming)
+#   - zookeeper     : Necessário para o Kafka funcionar
+#   - pgadmin       : Interface visual para o PostgreSQL
+#
+# COMO USAR:
+#   Subir tudo:    docker-compose up -d
+#   Ver logs:      docker-compose logs -f [serviço]
+#   Parar tudo:    docker-compose down
+#   Parar e limpar volumes: docker-compose down -v
+#
+# PORTAS EXPOSTAS:
+#   PostgreSQL: localhost:5432
+#   Airflow UI: http://localhost:8080 (admin/admin123)
+#   Kafka:      localhost:9092
+#   pgAdmin:    http://localhost:5050
+# =============================================================================
+
+version: '3.8'
+
+# =============================================================================
+# VOLUMES PERSISTENTES
+# Dados não são perdidos quando os containers são reiniciados
+# No AWS: equivale ao EBS (Elastic Block Store) volumes
+# =============================================================================
+volumes:
+  postgres_data:        # Dados do PostgreSQL (Redshift simulado)
+    driver: local
+  airflow_logs:         # Logs das execuções dos DAGs do Airflow
+    driver: local
+  airflow_plugins:      # Plugins customizados do Airflow
+    driver: local
+  kafka_data:           # Dados do Kafka (tópicos e mensagens)
+    driver: local
+  zookeeper_data:       # Dados do Zookeeper (coordenação do Kafka)
+    driver: local
+  zookeeper_log:        # Logs do Zookeeper
+    driver: local
+
+# =============================================================================
+# REDE INTERNA
+# Todos os containers se comunicam por nome (ex: postgres:5432)
+# No AWS: equivale a uma VPC (Virtual Private Cloud) privada
+# =============================================================================
+networks:
+  data_platform_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# =============================================================================
+# SERVIÇOS
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # POSTGRESQL - Simula Amazon Redshift
+  # ---------------------------------------------------------------------------
+  # Amazon Redshift REAL:
+  #   - Banco colunar otimizado para analytics
+  #   - Suporta PB de dados
+  #   - SQL compatível com PostgreSQL
+  #   - Custo: ~$0.25/hora por nó
+  #
+  # Simulação local:
+  #   - PostgreSQL é compatível com SQL do Redshift
+  #   - Perfeito para aprender queries, DDL, stored procedures
+  #   - Limitação: não tem compressão colunar real do Redshift
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: dataplatform_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dataplatform}
+      POSTGRES_USER: ${POSTGRES_USER:-dataplatform_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataplatform_pass123}
+      # Criar múltiplos bancos na inicialização
+      POSTGRES_MULTIPLE_DATABASES: dataplatform,airflow_db,crm_source
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Script de inicialização: cria múltiplos bancos
+      - ./redshift/ddl:/docker-entrypoint-initdb.d/ddl:ro
+      - ./scripts/init_postgres.sh:/docker-entrypoint-initdb.d/init_postgres.sh:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - data_platform_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dataplatform_user} -d ${POSTGRES_DB:-dataplatform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      postgres
+        -c max_connections=200
+        -c shared_buffers=256MB
+        -c work_mem=16MB
+        -c maintenance_work_mem=128MB
+        -c log_statement=all
+        -c log_duration=on
+
+  # ---------------------------------------------------------------------------
+  # PGADMIN - Interface visual para PostgreSQL
+  # ---------------------------------------------------------------------------
+  # Acesse em: http://localhost:5050
+  # Login: admin@dataplatform.com / pgadmin123
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: dataplatform_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@dataplatform.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - ./scripts/pgadmin_servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "5050:80"
+    networks:
+      - data_platform_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # ZOOKEEPER - Coordenador do Kafka
+  # ---------------------------------------------------------------------------
+  # O Zookeeper é necessário para o Kafka gerenciar:
+  #   - Eleição de líderes de partições
+  #   - Armazenar configurações
+  #   - Coordenar brokers do cluster
+  #
+  # No AWS Kinesis: não existe Zookeeper (é gerenciado pela AWS)
+  # ---------------------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: dataplatform_zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    ports:
+      - "2181:2181"
+    networks:
+      - data_platform_net
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # KAFKA - Simula Amazon Kinesis (streaming de dados)
+  # ---------------------------------------------------------------------------
+  # Amazon Kinesis REAL:
+  #   - Streaming gerenciado, sem servidor para gerenciar
+  #   - Shards (partições) definem throughput
+  #   - Retenção padrão: 24h (pode extender para 7 dias)
+  #   - Custo: $0.015/shard-hora + $0.08/GB ingerido
+  #
+  # Kafka local:
+  #   - Open-source, mais configurável que Kinesis
+  #   - Conceitos similares: tópicos ≈ streams, partições ≈ shards
+  #   - Retenção configurável
+  #   - Producer/Consumer API muito similar ao Kinesis SDK
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: dataplatform_kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Endereço interno (outros containers) e externo (seu computador)
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      # Retenção de mensagens: 7 dias (168 horas)
+      KAFKA_LOG_RETENTION_HOURS: 168
+      # Tamanho máximo por partição: 1GB
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_NUM_PARTITIONS: 3
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    ports:
+      - "9092:9092"
+    networks:
+      - data_platform_net
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # KAFKA UI - Interface visual para Kafka
+  # ---------------------------------------------------------------------------
+  # Acesse em: http://localhost:8090
+  # Permite visualizar tópicos, mensagens, consumer groups
+  # ---------------------------------------------------------------------------
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: dataplatform_kafka_ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    ports:
+      - "8090:8080"
+    networks:
+      - data_platform_net
+
+  # ---------------------------------------------------------------------------
+  # AIRFLOW - Inicialização (roda uma vez para configurar o banco)
+  # ---------------------------------------------------------------------------
+  airflow-init:
+    image: apache/airflow:2.8.1-python3.11
+    container_name: dataplatform_airflow_init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-dataplatform_user}:${POSTGRES_PASSWORD:-dataplatform_pass123}@postgres:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg=}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-minha_chave_secreta_airflow_123}
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_WWW_USER_USERNAME:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_WWW_USER_PASSWORD:-admin123}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - airflow_logs:/opt/airflow/logs
+    networks:
+      - data_platform_net
+    entrypoint: /bin/bash
+    command: >
+      -c "
+        airflow db init &&
+        airflow db upgrade &&
+        airflow users create
+          --username admin
+          --firstname Admin
+          --lastname User
+          --role Admin
+          --email admin@dataplatform.com
+          --password admin123 || true
+      "
+
+  # ---------------------------------------------------------------------------
+  # AIRFLOW WEBSERVER - Interface web do Airflow
+  # ---------------------------------------------------------------------------
+  # Acesse em: http://localhost:8080
+  # Login: admin / admin123
+  #
+  # Airflow MWAA Real:
+  #   - Gerenciado pela AWS
+  #   - Sem necessidade de gerenciar infra
+  #   - Custo: ~$0.49/hora + custos de worker
+  # ---------------------------------------------------------------------------
+  airflow-webserver:
+    image: apache/airflow:2.8.1-python3.11
+    container_name: dataplatform_airflow_webserver
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-dataplatform_user}:${POSTGRES_PASSWORD:-dataplatform_pass123}@postgres:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg=}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-minha_chave_secreta_airflow_123}
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - airflow_logs:/opt/airflow/logs
+      - .:/opt/data_platform  # Monta o projeto inteiro para os DAGs acessarem
+    ports:
+      - "8080:8080"
+    networks:
+      - data_platform_net
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # AIRFLOW SCHEDULER - Agendador de DAGs
+  # ---------------------------------------------------------------------------
+  # O scheduler é responsável por:
+  #   - Verificar quais DAGs devem ser executados
+  #   - Criar task instances
+  #   - Enviar tasks para o executor
+  # ---------------------------------------------------------------------------
+  airflow-scheduler:
+    image: apache/airflow:2.8.1-python3.11
+    container_name: dataplatform_airflow_scheduler
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-dataplatform_user}:${POSTGRES_PASSWORD:-dataplatform_pass123}@postgres:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg=}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-minha_chave_secreta_airflow_123}
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - airflow_logs:/opt/airflow/logs
+      - .:/opt/data_platform
+    networks:
+      - data_platform_net
+    command: scheduler
+
+  # ---------------------------------------------------------------------------
+  # AIRBYTE - Ferramenta de ingestão de dados
+  # ---------------------------------------------------------------------------
+  # Airbyte é uma plataforma open-source de integração de dados.
+  # No AWS: seria substituído por AWS DMS ou Glue Connectors
+  #
+  # NOTA: Airbyte completo requer múltiplos containers.
+  # Aqui usamos uma versão simplificada para fins educacionais.
+  # Para Airbyte completo: https://docs.airbyte.com/deploying-airbyte/docker-compose
+  # ---------------------------------------------------------------------------
+  airbyte-server:
+    image: airbyte/server:0.50.33
+    container_name: dataplatform_airbyte
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - AIRBYTE_VERSION=0.50.33
+      - DATABASE_USER=${POSTGRES_USER:-dataplatform_user}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-dataplatform_pass123}
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_DB=airbyte_db
+      - WORKSPACE_ROOT=/tmp/workspace
+      - CONFIG_ROOT=/data
+    ports:
+      - "8001:8001"
+    networks:
+      - data_platform_net
+    profiles:
+      - airbyte  # Só sobe com: docker-compose --profile airbyte up

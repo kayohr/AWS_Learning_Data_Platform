@@ -1,0 +1,89 @@
+# =============================================================================
+# DEPENDÊNCIAS PYTHON - Plataforma de Dados Local
+# =============================================================================
+# Instale com: pip install -r requirements.txt
+# Recomendado: usar um ambiente virtual Python
+#   python -m venv venv
+#   source venv/bin/activate  (Linux/Mac)
+#   venv\Scripts\activate     (Windows)
+#   pip install -r requirements.txt
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# APACHE AIRFLOW - Orquestração de pipelines
+# AWS equivalente: MWAA (Managed Workflows for Apache Airflow)
+# Versão 2.x é a mais usada em produção
+# -----------------------------------------------------------------------------
+apache-airflow==2.8.1
+apache-airflow-providers-postgres==5.10.0
+apache-airflow-providers-amazon==8.14.0
+
+# -----------------------------------------------------------------------------
+# BANCO DE DADOS - Conexão com PostgreSQL (simula Redshift)
+# psycopg2: driver para conectar Python ao PostgreSQL/Redshift
+# SQLAlchemy: ORM e abstração de banco de dados
+# -----------------------------------------------------------------------------
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.25
+alembic==1.13.1
+
+# -----------------------------------------------------------------------------
+# AWS SDK - boto3 (aqui usado com mock/LocalStack)
+# No AWS real: boto3 conecta diretamente aos serviços AWS
+# Ex: s3_client.upload_file(), sqs_client.send_message()
+# -----------------------------------------------------------------------------
+boto3==1.34.14
+botocore==1.34.14
+moto==4.2.14  # Mock AWS para testes locais (simula S3, SQS, Lambda, etc.)
+
+# -----------------------------------------------------------------------------
+# PROCESSAMENTO DE DADOS
+# pandas: manipulação de DataFrames (como Spark localmente)
+# pyarrow: leitura/escrita de arquivos Parquet (formato usado no S3/Glue)
+# fastparquet: alternativa para Parquet
+# numpy: operações numéricas
+# -----------------------------------------------------------------------------
+pandas==2.1.4
+pyarrow==14.0.2
+fastparquet==2023.10.1
+numpy==1.26.3
+
+# -----------------------------------------------------------------------------
+# QUALIDADE DE DADOS
+# great_expectations: framework de validação de dados
+# No AWS real: integra com Glue Data Quality
+# -----------------------------------------------------------------------------
+great-expectations==0.18.8
+
+# -----------------------------------------------------------------------------
+# KAFKA - Streaming de eventos (simula Amazon Kinesis)
+# kafka-python: cliente Python para Apache Kafka
+# No AWS real: seria substituído por boto3 com kinesis_client
+# -----------------------------------------------------------------------------
+kafka-python==2.0.2
+confluent-kafka==2.3.0
+
+# -----------------------------------------------------------------------------
+# GERAÇÃO DE DADOS FICTÍCIOS
+# faker: gera dados realistas (nomes, CPF, endereços brasileiros)
+# -----------------------------------------------------------------------------
+faker==22.2.0
+
+# -----------------------------------------------------------------------------
+# UTILITÁRIOS GERAIS
+# -----------------------------------------------------------------------------
+python-dotenv==1.0.0    # Carregar variáveis do arquivo .env
+requests==2.31.0        # Requisições HTTP (consumir APIs)
+pyyaml==6.0.1           # Ler arquivos YAML (configs Airbyte, Jitsu)
+croniter==2.0.1         # Parsear expressões cron (schedules do Airflow)
+colorlog==6.8.0         # Logs coloridos no terminal
+tabulate==0.9.0         # Formatar tabelas no terminal
+click==8.1.7            # CLI (interface de linha de comando)
+tqdm==4.66.1            # Barra de progresso
+
+# -----------------------------------------------------------------------------
+# TESTES
+# -----------------------------------------------------------------------------
+pytest==7.4.4
+pytest-mock==3.12.0
+coverage==7.4.0
